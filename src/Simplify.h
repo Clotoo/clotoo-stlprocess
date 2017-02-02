@@ -912,6 +912,19 @@ struct vertex_comp {
 		fclose(fn);
 		printf("load_stl: read %i triangles\n", read_count);
 
+		// The following 3-steps process is an exact copy of the ASSIMP process
+		// see https://github.com/assimp/assimp/blob/master/code/STLLoader.cpp
+		// and https://github.com/assimp/assimp/blob/master/code/ObjExporter.cpp
+
+		// This could all be done in one step here, but for some reason the results of Simplify are worse.
+		// Even with these 3 steps, the results are not as good as when loading OBJ directly.
+		// Loading an OBJ converted with ../js/stl2obj.js also gives better result, even though it doesn't do anything fancy.
+		// Best to worst results :
+		// 1. ASSIMP convert STL to OBJ before Simplify           >> perfect
+		// 2. node stl2obj.js convert STL to OBJ before Simplify  >> good but one or two artifacts
+		// 3. Simplify using load_stl with 3 loops                >> several small hitches
+		// 4. Simplify using load_stl with 1 loop (commented out) >> LOTS of small hitches
+
 		printf("load_stl: loading ALL...\n");
 		unsigned int reversed_normals = 0;
 		loopi(0, read_count)
@@ -938,7 +951,7 @@ struct vertex_comp {
 			vec3f fileNormal(tris[i].n[0], tris[i].n[1], tris[i].n[2]);
 			vec3f calcNormal;
 			calcNormal.cross(v2-v1,v3-v1).normalize();
-			printf("[D] dot = %f\n", calcNormal.dot(fileNormal));
+			//printf("[D] dot = %f\n", calcNormal.dot(fileNormal));
 			if ( calcNormal.dot(fileNormal) < 0 )
 			{
 				reversed_normals++;
