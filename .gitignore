@@ -1,7 +1,7 @@
 *.o
 assimp/
-STL/
-*.obj
-win32/
 pak/
 pak.zip
+TEST/
+*.obj
+*.stl
