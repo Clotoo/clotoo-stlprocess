@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <map>
 #include <math.h>
 #include <float.h> //FLT_EPSILON, DBL_EPSILON
 
@@ -289,6 +290,9 @@ namespace Simplify
 	std::vector<Vertex> vertices;
 	std::vector<Ref> refs;
 
+	int triangle_count = 0;
+	int deleted_triangles = 0;
+
 	// Helper functions
 
 	double vertex_error(SymetricMatrix q, double x, double y, double z);
@@ -312,9 +316,9 @@ namespace Simplify
 		loopi(0,triangles.size()) triangles[i].deleted=0;
 
 		// main iteration loop
-		int deleted_triangles=0;
+		deleted_triangles = 0;
 		std::vector<int> deleted0,deleted1;
-		int triangle_count=triangles.size();
+		triangle_count = triangles.size();
 		//int iteration = 0;
 		//loop(iteration,0,100)
 		for (int iteration = 0; iteration < 100; iteration ++)
@@ -845,6 +849,241 @@ namespace Simplify
 			//fprintf(file, "f %d// %d// %d//\n", triangles[i].v[0]+1, triangles[i].v[1]+1, triangles[i].v[2]+1); //more compact: remove trailing zeros
 		}
 		fclose(file);
+	}
+
+
+#pragma pack(1)
+struct stl_triangle
+{
+	float n[3];
+	float v[3][3];
+	uint16_t attr;
+};
+#pragma pack(4)
+
+// required for std::map
+struct vertex_comp {
+	bool operator()(const struct Vertex& v1, const struct Vertex& v2)
+	{
+		if ( v1.p.x < v2.p.x ) return true;
+		if ( v1.p.x > v2.p.x ) return false;
+		if ( v1.p.y < v2.p.y ) return true;
+		if ( v1.p.y > v2.p.y ) return false;
+		if ( v1.p.z < v2.p.z ) return true;
+		return false;
+	}
+};
+
+//NOTES:
+// The tool doesn't work correctly with this STL loader for some reason...
+// Using an external tool to convert STL to OBJ and then using tool on OBJ gives much better results.
+// Exporting to STL works fine though, to avoid the OBJ to STL conversion extra cost.
+
+	void load_stl(const char* filename){
+		vertices.clear();
+		triangles.clear();
+		//printf ( "Loading Objects %s ... \n",filename);
+		FILE* fn;
+		if(filename==NULL)		return ;
+		if((char)filename[0]==0)	return ;
+		if ((fn = fopen(filename, "rb")) == NULL)
+		{
+			printf ( "File %s not found!\n" ,filename );
+			return;
+		}
+
+		//skip 80 bytes header
+		fseek(fn, 80, SEEK_SET);
+
+		//read triangles count
+		uint32_t count;
+		fread(&count, sizeof(uint32_t), 1, fn);
+		printf("load_stl: count = %i\n", count);
+
+		//read triangles
+		struct stl_triangle *tris = (struct stl_triangle*)calloc(count, sizeof(struct stl_triangle));
+		if ( tris == NULL )
+		{
+			printf("load_stl: failed to alloc mem for triangles\n");
+			exit(0);
+		}
+		int read_count = fread(tris, sizeof(struct stl_triangle), count, fn);
+		fclose(fn);
+		printf("load_stl: read %i triangles\n", read_count);
+
+		printf("load_stl: loading ALL...\n");
+		unsigned int reversed_normals = 0;
+		loopi(0, read_count)
+		{
+			loopj(0,3)
+				loopk(0,3)
+					tris[i].v[j][k] = round(tris[i].v[j][k]*10000)/10000;
+
+			if ( i < 4 && true )
+			{
+				printf("[D] read tri: n=(%f,%f,%f) (%f,%f,%f) (%f,%f,%f) (%f,%f,%f) attr=%u\n",
+					tris[i].n[0], tris[i].n[1], tris[i].n[2],
+					tris[i].v[0][0], tris[i].v[0][1], tris[i].v[0][2],
+					tris[i].v[1][0], tris[i].v[1][1], tris[i].v[1][2],
+					tris[i].v[2][0], tris[i].v[2][1], tris[i].v[2][2],
+					tris[i].attr);
+			}
+
+			vec3f v1(tris[i].v[0][0], tris[i].v[0][1], tris[i].v[0][2]);
+			vec3f v2(tris[i].v[1][0], tris[i].v[1][1], tris[i].v[1][2]);
+			vec3f v3(tris[i].v[2][0], tris[i].v[2][1], tris[i].v[2][2]);
+			vec3f ordered[] = {v1,v2,v3};
+
+			vec3f fileNormal(tris[i].n[0], tris[i].n[1], tris[i].n[2]);
+			vec3f calcNormal;
+			calcNormal.cross(v2-v1,v3-v1).normalize();
+			printf("[D] dot = %f\n", calcNormal.dot(fileNormal));
+			if ( calcNormal.dot(fileNormal) < 0 )
+			{
+				reversed_normals++;
+				ordered[1] = v3;
+				ordered[2] = v2;
+			}
+
+			Triangle t;
+			loopj(0,3)
+			{
+				t.v[j] = vertices.size();
+				Vertex v;
+				v.p = ordered[j];
+				vertices.push_back(v);
+			}
+			triangles.push_back(t);
+		}
+		printf("read_stl: reversed normals = %lu\n", reversed_normals);
+
+		printf("load_stl: merging vertices...\n");
+		unsigned int nextIdx = 0;
+		std::map<struct Vertex, int, vertex_comp> unique_vertices;
+		loopi(0, triangles.size())
+		{
+			loopj(0,3)
+			{
+				const unsigned int idx = triangles[i].v[j];
+				Vertex v = vertices[idx];
+
+				// add to map (remove duplicates)
+				std::map<struct Vertex, int, vertex_comp>::iterator it = unique_vertices.find(v);
+				if ( it != unique_vertices.end() )
+					triangles[i].v[j] = it->second;
+				else
+				{
+					unique_vertices[v] = nextIdx;
+					triangles[i].v[j] = nextIdx;
+					nextIdx++;
+				}
+			}
+		}
+
+		printf("load_stl: refilling vertices...\n");
+		vertices.resize(unique_vertices.size());
+		for ( std::map<struct Vertex, int, vertex_comp>::iterator it=unique_vertices.begin(); it!=unique_vertices.end(); ++it )
+			vertices[it->second] = it->first;
+
+		/*
+		std::map<struct stl_vert, int, stl_vert_comp> unique_vertices;
+		loopi(0, read_count)
+		{
+			loopj(0,3)
+				loopk(0,3)
+					tris[i].v[j][k] = round(tris[i].v[j][k]*10000)/10000;
+
+			if ( i < 4 && false )
+			{
+				printf("[D] read tri: n=(%f,%f,%f) (%f,%f,%f) (%f,%f,%f) (%f,%f,%f) attr=%u\n",
+					tris[i].n[0], tris[i].n[1], tris[i].n[2],
+					tris[i].v[0][0], tris[i].v[0][1], tris[i].v[0][2],
+					tris[i].v[1][0], tris[i].v[1][1], tris[i].v[1][2],
+					tris[i].v[2][0], tris[i].v[2][1], tris[i].v[2][2],
+					tris[i].attr);
+			}
+
+			Triangle t;
+
+			// link triangle to vertices
+			loopj(0,3)
+			{
+				// don't push duplicate vertices!
+				stl_vert v(tris[i].v[j][0], tris[i].v[j][1], tris[i].v[j][2]);
+				std::map<struct stl_vert, int, stl_vert_comp>::iterator existing = unique_vertices.find(v);
+				if ( existing != unique_vertices.end() )
+					t.v[j] = existing->second;
+				else
+				{
+					unique_vertices[v] = vertices.size();
+					t.v[j] = vertices.size();
+
+					Vertex newV;
+					newV.p.x = v.x;
+					newV.p.y = v.y;
+					newV.p.z = v.z;
+					vertices.push_back(newV);
+				}
+			}
+
+			triangles.push_back(t);
+
+			if ( triangles.size() % 10000 == 0 )
+				printf("load_stl: parsed %lu triangles - %lu vertices\n", triangles.size(), vertices.size());
+		}
+		*/
+		printf("load_stl: vertices = %lu, triangles = %lu\n", vertices.size(), triangles.size() );
+
+		free(tris);
+	} // load_stl()
+
+	void write_stl(const char* filename)
+	{
+		FILE *file = fopen(filename, "wb");
+		if ( !file )
+		{
+			printf("write_stl: can't write data file \"%s\"\n", filename);
+			exit(0);
+		}
+
+		int output_count = triangle_count - deleted_triangles;
+		struct stl_triangle *tris = (struct stl_triangle*)calloc(output_count, sizeof(struct stl_triangle));
+		int num = 0;
+		loopi(0, triangles.size())
+		{
+			if ( !triangles[i].deleted )
+			{
+				if ( num >= output_count )
+				{
+					printf("write_stl: error with triangle count (%d / %d)\n", num, output_count);
+					exit(0);
+				}
+
+				//dont care about normals???
+				tris[num].n[0] = 0;
+				tris[num].n[1] = 0;
+				tris[num].n[2] = 0;
+
+				loopj(0,3)
+				{
+					tris[num].v[j][0] = vertices[ triangles[i].v[j] ].p.x;
+					tris[num].v[j][1] = vertices[ triangles[i].v[j] ].p.y;
+					tris[num].v[j][2] = vertices[ triangles[i].v[j] ].p.z;
+				}
+				
+				num++;
+			}
+		}
+
+		char header[84];
+		memset(header, 0, 80);
+		*(uint32_t*)(&header[80]) = output_count;
+		fwrite(header, 84, 1, file);
+		fwrite(tris, sizeof(stl_triangle), output_count, file);
+
+		fclose(file);
+
+		free(tris);
 	}
 };
 ///////////////////////////////////////////

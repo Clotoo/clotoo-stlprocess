@@ -18,6 +18,7 @@
 #include "Simplify.h"
 #include <stdio.h>
 #include <time.h>  // clock_t, clock, CLOCKS_PER_SEC
+#include <strings.h>
 
 void showHelp(const char * argv[]) {
     const char *cstr = (argv[0]);
@@ -40,7 +41,12 @@ int main(int argc, const char * argv[]) {
         showHelp(argv);
         return EXIT_SUCCESS;
     }
-	Simplify::load_obj(argv[1]);
+
+	if ( strcasecmp(&(argv[1][strlen(argv[1])-4]), ".stl") == 0 )
+		Simplify::load_stl(argv[1]);
+	else
+		Simplify::load_obj(argv[1]);
+
 	if ((Simplify::triangles.size() < 3) || (Simplify::vertices.size() < 3))
 		return EXIT_FAILURE;
 	int target_count =  Simplify::triangles.size() >> 1;
@@ -70,7 +76,12 @@ int main(int argc, const char * argv[]) {
 		printf("Unable to reduce mesh.\n");
     	return EXIT_FAILURE;
 	}
-	Simplify::write_obj(argv[2]);
+
+	if ( strcasecmp(&(argv[2][strlen(argv[2])-4]), ".stl") == 0 )
+		Simplify::write_stl(argv[2]);
+	else
+		Simplify::write_obj(argv[2]);
+
 	printf("Output: %zu vertices, %zu triangles (%f reduction; %.4f sec)\n",Simplify::vertices.size(), Simplify::triangles.size()
 		, (float)Simplify::triangles.size()/ (float) startSize  , ((float)(clock()-start))/CLOCKS_PER_SEC );
 	return EXIT_SUCCESS;
