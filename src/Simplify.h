@@ -25,6 +25,7 @@
 #include <map>
 #include <math.h>
 #include <float.h> //FLT_EPSILON, DBL_EPSILON
+#include <stdint.h>
 
 #define loopi(start_l,end_l) for ( int i=start_l;i<end_l;++i )
 #define loopi(start_l,end_l) for ( int i=start_l;i<end_l;++i )
@@ -955,7 +956,7 @@ struct vertex_comp {
 			}
 			triangles.push_back(t);
 		}
-		printf("read_stl: reversed normals = %lu\n", reversed_normals);
+		printf("read_stl: reversed normals = %u\n", reversed_normals);
 
 		printf("load_stl: merging vertices...\n");
 		unsigned int nextIdx = 0;
