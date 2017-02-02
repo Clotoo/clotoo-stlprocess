@@ -14,6 +14,8 @@ var response;
 
 console.log('Loading function');
 
+//TODO: first step = detect STL ASCII >> convert to Binary and reupload to source bucket
+
 exports.handler = (event, context, callback) => {
 	try {
 		console.log('Received event:', JSON.stringify(event, null, 2));
@@ -21,7 +23,7 @@ exports.handler = (event, context, callback) => {
 		response = {};
 
 		stlBucket = new AWS.S3({ params: { Bucket: event.stlBucket } });
-		stlBucket = new AWS.S3({ params: { Bucket: event.lpstlBucket } });
+		lpstlBucket = new AWS.S3({ params: { Bucket: event.lpstlBucket } });
 
 		var inputFilePath = path.join(tmp, event.inputFile.awsRef);
 		var outputFilePath = path.join(tmp, event.outputFile.awsRef);

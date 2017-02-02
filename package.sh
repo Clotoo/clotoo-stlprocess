@@ -1,5 +1,5 @@
 #!/bin/sh
-rm -rf pak
+rm -rf pak pak.zip
 mkdir pak
 cp bin/assimp pak/
 cp bin/simplify pak/
