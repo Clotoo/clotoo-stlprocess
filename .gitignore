@@ -1,7 +1,6 @@
 *.o
 assimp/
 pak/
-pak.zip
 TEST/
 *.obj
 *.stl
