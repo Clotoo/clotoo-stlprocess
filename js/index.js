@@ -48,7 +48,7 @@ exports.handler = (event, context, callback) => {
 				.then(function() {
 					inputStlPath = overrideFilePath;
 					return Promise.all([
-						uploadSTL(stlBucket, inputStl.awsRef, inputStlPath, inputStl.name),
+						uploadSTL(stlBucket, event.inputStl.awsRef, inputStlPath, event.inputStl.name),
 						// supposedly faster than validateBinarySTL - we assume we don't have to validate stl2stl's output
 						grabTriCount(inputStlPath),
 					]);
