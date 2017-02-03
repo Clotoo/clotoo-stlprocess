@@ -4,3 +4,4 @@ pak/
 TEST/
 *.obj
 *.stl
+js/node_modules/
