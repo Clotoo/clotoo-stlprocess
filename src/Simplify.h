@@ -921,7 +921,7 @@ struct vertex_comp {
 		// Loading an OBJ converted with ../js/stl2obj.js also gives better result, even though it doesn't do anything fancy.
 		// Best to worst results :
 		// 1. ASSIMP convert STL to OBJ before Simplify           >> perfect
-		// 2. node stl2obj.js convert STL to OBJ before Simplify  >> good but one or two artifacts
+		// 2. node stl2obj.js convert STL to OBJ before Simplify  >> one or two flipped faces, small hitches are less accentuated
 		// 3. Simplify using load_stl with 3 loops                >> several small hitches
 		// 4. Simplify using load_stl with 1 loop (commented out) >> LOTS of small hitches
 

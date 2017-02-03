@@ -85,7 +85,6 @@ function parseCmd(args) {
 		cmd.outFile = cmd.file.slice(0,-4)+'.obj';
 
 	console.debug("debug : " + cmd.debug);
-	console.debug("flush_size = " + cmd.flush_size);
 	console.debug("input file = " + cmd.file);
 	console.debug("output file = " + cmd.outFile);
 }
@@ -174,14 +173,14 @@ function generateObj(object, file) {
 		text += "# " + c + "\n";
 	}
 	function writeVertex(v) {
-		text += "v  " + v.join(' ') + '\n';
+		text += "v " + v.join(' ') + '\n';
 	}
 	function writeNormal(v) {
-		text += "vn  " + v.join(' ') + '\n';
+		text += "vn " + v.join(' ') + '\n';
 	}
 	function writeTriangle(t) {
 		//text += "f  " + [t.v[0]+"//"+t.nidx, t.v[1]+"//"+t.nidx, t.v[2]+"//"+t.nidx].join(' ') + '\n';
-		text += "f  " + [ (t.v[0]+1), (t.v[1]+1), (t.v[2]+1) ].join(' ') + '\n';
+		text += "f " + [ (t.v[0]+1), (t.v[1]+1), (t.v[2]+1) ].join(' ') + '\n';
 	}
 	function flush() {
 		console.debug(">>flush");
@@ -191,9 +190,7 @@ function generateObj(object, file) {
 	}
 
 	fs.writeFileSync(file, "", 'utf-8');
-/*
-mtllib SurTalon01.obj.mtl
-*/
+
 	comment(object.vertices.length + " vertex positions");
 	for ( var i=0; i<object.vertices.length; i++ ) {
 		writeVertex(object.vertices[i]);
@@ -208,10 +205,6 @@ mtllib SurTalon01.obj.mtl
 		if ( text.length > cmd.flush_size ) flush();
 	}
 	*/
-/*
-g <STL_BINARY>
-usemtl DefaultMaterial
-*/
 
 	comment(object.triangles.length + " triangles");
 	for ( var i=0; i<object.triangles.length; i++ ) {

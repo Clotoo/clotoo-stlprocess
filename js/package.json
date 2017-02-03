@@ -1,0 +1,16 @@
+{
+  "name": "clotoo-stlprocess",
+  "version": "1.0.0",
+  "description": "bla",
+  "repository": "git@github.com:Clotoo/clotoo-stlprocess.git",
+  "main": "test.js",
+  "dependencies": {
+    "event-stream": "3.3.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node test.js"
+  },
+  "author": "",
+  "license": "ISC"
+}

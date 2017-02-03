@@ -1,4 +1,4 @@
 #!/bin/sh
-gcc -o win32/simplify.o -c src/Main.cpp
-gcc -o win32/simplify win32/simplify.o -static -lm -lstdc++
-rm -f win32/simplify.o
+gcc -o js/simplify.o -c src/Main.cpp
+gcc -o js/simplify js/simplify.o -static -lm -lstdc++
+rm -f js/simplify.o
