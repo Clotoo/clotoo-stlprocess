@@ -6,14 +6,14 @@ const exec = require('child_process').exec;
 
 // One triangle == 50 bytes in STL binary form
 // => reduce to 40k triangles = 2 Mbytes
-const TARGET_TRIANGLES = 40000;
+const TARGET_TRIANGLES = exports.TARGET_TRIANGLES = 40000;
 // Algorithm to reduce mesh is expensive (and jerky, for now)
 // => only run if it is significant
-const REDUCE_THRESHOLD = 0.8;
+const REDUCE_THRESHOLD = exports.REDUCE_THRESHOLD = 0.8;
 
-const AWS = require('aws-sdk');
+const AWS = process.env.testing ? null : require('aws-sdk');
 
-const tmp = path.resolve('/tmp');
+const tmp = process.env.testing ? path.resolve('./tmp') : path.resolve('/tmp');
 
 //for testing locally
 //const tmp = path.resolve('./tmp');
@@ -37,7 +37,10 @@ exports.handler = (event, context, callback) => {
 		var reducedStlPath = path.join(tmp, event.reducedStl.awsRef);
 		var reduceFactor = 1.0;
 
-		downloadSTL(stlBucket, event.inputStl.awsRef, inputStlPath)
+		// Phase 1 = STL conversion and validation
+		// Errors occuring here are critical => STL is invalid
+
+		return downloadSTL(stlBucket, event.inputStl.awsRef, inputStlPath)
 		.then(function() {
 			return checkSTLMode(inputStlPath)
 		})
@@ -61,34 +64,52 @@ exports.handler = (event, context, callback) => {
 				return validateBinarySTL(inputStlPath);
 		})
 		.then(function(triCount) {
-			reduceFactor = TARGET_TRIANGLES / triCount;
-			reduceFactor = Math.round(10000*reduceFactor)/10000;
-			console.log(">> Calculated reduceFactor = " + reduceFactor);
 
-			if ( reduceFactor < REDUCE_THRESHOLD ) {
-				// convert to OBJ, Simplify, and upload reduced STL to lpstl bucket
-				response.reduced = true;
+			// Phase 2 = STL reduction
+			// Errors occuring here are not critical
 
-				//return execCmd(`${  __dirname }/assimp export ${ inputStlPath } ${ objPath }`);
-				// FUCK assimp for now, use ours
-				return execCmd(`node --expose-gc ${ __dirname }/stl2obj.js ${ inputStlPath } -o ${ objPath } -f 5000000`)
-				.then(function() {
-					return execCmd(`${ __dirname }/simplify ${ objPath } ${reducedStlPath } ${ reduceFactor }`);
-				})
-				.then(function() {
-					return uploadSTL(lpstlBucket, event.reducedStl.awsRef, reducedStlPath, event.reducedStl.name);
-				});
-			}
-			else {
-				console.log(">> Skipping reduce");
-				response.reduced = false;	//webapp needs to know if we actually reduced it or not
-			}
-		})
-		.then(function() {
-			response.status = 'OK';
+			// >> Start new nested promise
+			return Promise.resolve(true)
+			.then(function() {
+				reduceFactor = TARGET_TRIANGLES / triCount;
+				reduceFactor = Math.round(10000*reduceFactor)/10000;
+				console.log(">> Calculated reduceFactor = " + reduceFactor);
+
+				if ( reduceFactor < REDUCE_THRESHOLD ) {
+					// convert to OBJ, Simplify, and upload reduced STL to lpstl bucket
+					response.reduced = true;
+
+					//return execCmd(`${  __dirname }/assimp export ${ inputStlPath } ${ objPath }`);
+					// FUCK assimp for now, use ours
+					return execCmd(`node --expose-gc ${ __dirname }/stl2obj.js ${ inputStlPath } -o ${ objPath } -f 5000000`)
+					.then(function() {
+						return execCmd(`${ __dirname }/simplify ${ objPath } ${reducedStlPath } ${ reduceFactor }`);
+					})
+					.then(function() {
+						return uploadSTL(lpstlBucket, event.reducedStl.awsRef, reducedStlPath, event.reducedStl.name);
+					});
+				}
+				else {
+					console.log(">> Skipping reduce");
+					response.reduced = false;	//webapp needs to know if we actually reduced it or not
+				}
+			})
+			.then(function() {
+				response.status = 'OK';
+			})
+			.catch(function(err) {
+				// reduction error - STL won't be reduced
+				console.error("ERROR in phase 2", err);
+				response.status = 'OK';
+				response.reduced = false;
+				if ( !response.info )
+					response.info = 'unknown:'+err.name+':'+err.message;
+			});
+
 		})
 		.catch(function(err) {
-			console.error(err);
+			// critical error - STL is invalid
+			console.error("ERROR in phase 1", err);
 			response.status = 'ERROR';
 			if ( !response.info )
 				response.info = 'unknown:'+err.name+':'+err.message;
@@ -226,7 +247,7 @@ var execCmd = exports.execCmd = function(cmd) {
 
 
 var downloadSTL = exports.downloadSTL = function(bucket, key, filePath) {
-	console.log(">> Downloading " + key);
+	console.log(">> Downloading", key, "to", filePath);
 	return new Promise(function(_resolve, _reject) {
 		function reject(err) {
 			response.info = 'download:' + key + ':' + err.message;
@@ -247,7 +268,7 @@ var downloadSTL = exports.downloadSTL = function(bucket, key, filePath) {
 
 
 var uploadSTL = exports.uploadSTL = function(bucket, key, filePath, name) {
-	console.log(">> Uploading " + key);
+	console.log(">> Uploading", filePath, "to", key);
 	return new Promise(function(_resolve, _reject) {
 		function reject(err) {
 			response.info = 'upload:'+key+':'+err.message;
@@ -275,7 +296,7 @@ var cleanup = exports.cleanup = function() {
 	fs.readdir(tmp, function(err, files) {
 		if ( !files ) return;
 		files.forEach(function(f) {
-			if ( f.toLowerCase().endsWith('.stl') || f.toLowerCase().endsWith('.obj') )
+			if ( f.toLowerCase().endsWith('.stl') || f.toLowerCase().endsWith('.obj') || f.toLowerCase().endsWith('.tmp') )
 				fs.unlink(path.join(tmp, f), function(err) { if ( err ) console.error(err); });
 		});
 	});
