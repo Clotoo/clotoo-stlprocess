@@ -1,6 +1,5 @@
 
 const fs = require('fs');
-const es = require('event-stream');
 
 
 //================================================
@@ -68,7 +67,7 @@ function parseCmd(args) {
 			cmd.debug = true;
 
 		// GC Frequency
-		else if ( key.startsWith('--gc-freq=') )
+		else if ( key.startsWith('--gc-interval=') )
 			cmd.gc_interval = parseInt(args[i].substr(13));
 		else if ( key == '-gc' ) {
 			i++;
@@ -124,56 +123,59 @@ function readStlWritePart(input, output, cb) {
 	var lc = 0;
 	var triCount = 0;
 
-	fs.createReadStream(input).on('error', function(err) {
+	var text = "";
+
+	var rs = fs.createReadStream(input).on('error', function(err) {
 		console.error(err);
 		process.exit(1);
-	})
-	.pipe(es.split())
-	.pipe(
-		es.mapSync(function(line) {
-			lc++;
+	}).setEncoding('utf-8').on('data', function(chunk) {
+		text += chunk;
+		while ( (i = text.indexOf('\n')) != -1 ) {
+			rs.emit('line', text.substr(0,i));
+			text = text.substr(i+1);
+		}
+	}).on('line', function(line) {
+		lc++;
 
-			if ( lc%cmd.gc_interval == 0 )
-					global.gc && global.gc();
+		if ( lc%cmd.gc_interval == 0 )
+				global.gc && global.gc();
 
-			if ( m = line.match(/^[ \t\r\n]*vertex[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
-				//console.debug(lc, "vertex", m[1], m[2], m[3]);
-				if ( offset != 12 && offset != 24 && offset != 36 )
-					throw new Error("Invalid STL - line " + lc + " : unexpected vertex (b" + offset +")");
-				facetBuffer.writeFloatLE(parseFloat(m[1]), offset);
-				facetBuffer.writeFloatLE(parseFloat(m[2]), offset+4);
-				facetBuffer.writeFloatLE(parseFloat(m[3]), offset+8);
-				offset += 12;
-			}
-			else if ( m = line.match(/^[ \t\r\n]*facet[ \t]+normal[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
-				//console.debug(lc, "facet", m[1], m[2], m[3]);
-				facetBuffer.writeFloatLE(parseFloat(m[1]), 0);
-				facetBuffer.writeFloatLE(parseFloat(m[2]), 4);
-				facetBuffer.writeFloatLE(parseFloat(m[3]), 8);
-				offset = 12;
-			}
-			else if ( m = line.match(/^[ \t\r\n]*endfacet[ \t\r\n]*$/i) ) {
-				//console.debug(lc, "end facet");
-				triCount++;
-				if ( triCount % 10000 == 0 )
-					console.debug("read " + triCount + " facets");
+		if ( m = line.match(/^[ \t\r\n]*vertex[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
+			//console.debug(lc, "vertex", m[1], m[2], m[3]);
+			if ( offset != 12 && offset != 24 && offset != 36 )
+				throw new Error("Invalid STL - line " + lc + " : unexpected vertex (b" + offset +")");
+			facetBuffer.writeFloatLE(parseFloat(m[1]), offset);
+			facetBuffer.writeFloatLE(parseFloat(m[2]), offset+4);
+			facetBuffer.writeFloatLE(parseFloat(m[3]), offset+8);
+			offset += 12;
+		}
+		else if ( m = line.match(/^[ \t\r\n]*facet[ \t]+normal[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
+			//console.debug(lc, "facet", m[1], m[2], m[3]);
+			facetBuffer.writeFloatLE(parseFloat(m[1]), 0);
+			facetBuffer.writeFloatLE(parseFloat(m[2]), 4);
+			facetBuffer.writeFloatLE(parseFloat(m[3]), 8);
+			offset = 12;
+		}
+		else if ( m = line.match(/^[ \t\r\n]*endfacet[ \t\r\n]*$/i) ) {
+			//console.debug(lc, "end facet");
+			triCount++;
+			if ( triCount % 10000 == 0 )
+				console.debug("read " + triCount + " facets");
 
-				facetBuffer.writeUInt16LE(0, 48);
-				var tmp = facetBuffer;
-				facetBuffer = new Buffer(50);
-				return tmp;
-			}
-		})
-		.on('error', function(err) {
-			console.error(err);
-			return process.exit(1);
-		})
-		.on('end', function() {
+			facetBuffer.writeUInt16LE(0, 48);
+			outputStream.write(facetBuffer);
+
+			facetBuffer = new Buffer(50);
+		}
+	}).on('end', function() {
+		// last line
+		rs.emit('line', text);
+		// flush before finish, otherwise process exits before writing last chunk
+		outputStream.end(function() {
 			console.log("DONE! total " + triCount + " triangles");
 			cb(undefined, triCount);
-		})
-	)
-	.pipe(outputStream)
+		});
+	})
 }
 
 
