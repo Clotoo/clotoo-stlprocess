@@ -53,7 +53,9 @@ exports.handler = (event, context, callback) => {
 					return Promise.all([
 						uploadSTL(stlBucket, event.inputStl.awsRef, inputStlPath, event.inputStl.name),
 						// supposedly faster than validateBinarySTL - we assume we don't have to validate stl2stl's output
-						grabTriCount(inputStlPath),
+						//grabTriCount(inputStlPath),
+						// actually we should, because we don't know if the ascii STL was valid
+						validateBinarySTL(inputStlPath),
 					]);
 				})
 				.then(function(results) {
@@ -139,6 +141,7 @@ var checkSTLMode = exports.checkSTLMode = function(stlFile) {
 			_resolve(mode);
 		}
 		// Read first few bytes to check STL mode
+		/*
 		var buf = new Buffer(50);
 		fs.open(stlFile, 'r', function(err, fd) {
 			if ( err )
@@ -153,6 +156,42 @@ var checkSTLMode = exports.checkSTLMode = function(stlFile) {
 					resolve('ascii');
 				else
 					resolve('binary');
+			});
+		});
+		*/
+		//WARNING: checking file starts with "solid ..." does NOT work!
+		// Solidworks uses "solid ..." in their 80 bytes binary header (bullshit)
+		// We will look at offsets 80+ and look for non-printable characters...?
+		var buf = new Buffer(200);
+		fs.open(stlFile, 'r', function(err, fd) {
+			if ( err )
+				return reject(err);
+	
+			fs.read(fd, buf, 0, buf.length, null, function(err, bytesRead) {
+				if ( err )
+					return reject(err);
+
+				fs.close(fd);
+
+				var str = buf.toString('utf8');
+
+				// doesn't start with "solid ..." => binary
+				if ( ! str.toLowerCase().startsWith('solid ') )
+					return resolve('binary');
+
+				// less than 84 bytes => ascii
+				if ( bytesRead < 84 )
+					return resolve('ascii');
+
+				// check post-header bytes for non-ascii characters
+				str = str.substr(80);
+				var m = str.match(/[^a-zA-Z0-9-_ \t\r\n/*+.,]/g);
+				if ( m ) {
+					console.log("WARNING: starts with 'solid' but contains binary (" + m.length + "/" + str.length + ")");
+					if ( m.length > str.length/10 )
+						return resolve('binary');
+				}
+				resolve('ascii');
 			});
 		});
 	});
