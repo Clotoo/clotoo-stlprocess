@@ -42,7 +42,7 @@ exports.handler = (event, context, callback) => {
 
 		return downloadSTL(stlBucket, event.inputStl.awsRef, inputStlPath)
 		.then(function() {
-			return checkSTLMode(inputStlPath)
+			return checkSTLMode(inputStlPath);
 		})
 		.then(function(mode) {
 			if ( mode == 'ascii' ) {
@@ -60,7 +60,7 @@ exports.handler = (event, context, callback) => {
 				})
 				.then(function(results) {
 					return results[1];
-				})
+				});
 			}
 			else
 				return validateBinarySTL(inputStlPath);
@@ -195,7 +195,7 @@ var checkSTLMode = exports.checkSTLMode = function(stlFile) {
 			});
 		});
 	});
-}
+};
 
 
 var grabTriCount = exports.grabTriCount = function(binaryStlFile) {
@@ -228,7 +228,7 @@ var grabTriCount = exports.grabTriCount = function(binaryStlFile) {
 			});
 		});
 	});
-}
+};
 
 
 var validateBinarySTL = exports.validateBinarySTL = function(binaryStlFile) {
@@ -257,7 +257,7 @@ var validateBinarySTL = exports.validateBinarySTL = function(binaryStlFile) {
 			resolve(triCount);
 		});
 	});
-}
+};
 
 
 var execCmd = exports.execCmd = function(cmd) {
@@ -282,7 +282,7 @@ var execCmd = exports.execCmd = function(cmd) {
 			console.error(data.toString('utf-8'));
 		});
 	});
-}
+};
 
 
 var downloadSTL = exports.downloadSTL = function(bucket, key, filePath) {
@@ -303,7 +303,7 @@ var downloadSTL = exports.downloadSTL = function(bucket, key, filePath) {
 			.pipe(out)
 			.on('finish', resolve);
 	});
-}
+};
 
 
 var uploadSTL = exports.uploadSTL = function(bucket, key, filePath, name) {
@@ -328,7 +328,7 @@ var uploadSTL = exports.uploadSTL = function(bucket, key, filePath, name) {
 				resolve(data);
 		});
 	});
-}
+};
 
 
 var cleanup = exports.cleanup = function() {
@@ -339,4 +339,4 @@ var cleanup = exports.cleanup = function() {
 				fs.unlink(path.join(tmp, f), function(err) { if ( err ) console.error(err); });
 		});
 	});
-}
+};

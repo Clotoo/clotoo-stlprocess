@@ -46,6 +46,7 @@ function main(args) {
 
 		console.log("Writing header : " + tmpFiles[0]);
 		var buf = new Buffer(84);
+		buf.fill();
 		buf.writeUInt32LE(triCount, 80);
 		fs.writeFileSync(tmpFiles[0], buf);
 		console.log("DONE!");
@@ -119,6 +120,7 @@ function readStlWritePart(input, output, cb) {
 	});
 
 	var facetBuffer = new Buffer(50);
+	facetBuffer.fill();
 	var offset = 0;
 	var lc = 0;
 	var triCount = 0;
@@ -140,7 +142,7 @@ function readStlWritePart(input, output, cb) {
 		if ( lc%cmd.gc_interval == 0 )
 				global.gc && global.gc();
 
-		if ( m = line.match(/^[ \t\r\n]*vertex[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
+		if ( m = line.match(/^[ \t\r\n]*vertex[ \t]+([-+0-9.E]+)[ \t]+([-+0-9.E]+)[ \t]+([-+0-9.E]+)[ \t\r\n]*$/i) ) {
 			//console.debug(lc, "vertex", m[1], m[2], m[3]);
 			if ( offset != 12 && offset != 24 && offset != 36 )
 				throw new Error("Invalid STL - line " + lc + " : unexpected vertex (b" + offset +")");
@@ -149,7 +151,7 @@ function readStlWritePart(input, output, cb) {
 			facetBuffer.writeFloatLE(parseFloat(m[3]), offset+8);
 			offset += 12;
 		}
-		else if ( m = line.match(/^[ \t\r\n]*facet[ \t]+normal[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t]+([-0-9.E]+)[ \t\r\n]*$/i) ) {
+		else if ( m = line.match(/^[ \t\r\n]*facet[ \t]+normal[ \t]+([-+0-9.E]+)[ \t]+([-+0-9.E]+)[ \t]+([-+0-9.E]+)[ \t\r\n]*$/i) ) {
 			//console.debug(lc, "facet", m[1], m[2], m[3]);
 			facetBuffer.writeFloatLE(parseFloat(m[1]), 0);
 			facetBuffer.writeFloatLE(parseFloat(m[2]), 4);
@@ -166,6 +168,7 @@ function readStlWritePart(input, output, cb) {
 			outputStream.write(facetBuffer);
 
 			facetBuffer = new Buffer(50);
+			facetBuffer.fill();
 		}
 	}).on('end', function() {
 		// last line

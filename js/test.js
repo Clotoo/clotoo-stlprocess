@@ -5,7 +5,7 @@ const handler = require('./index.js');
 var response = {};
 
 local({
-	inputStlPath: "./tmp/De.stl",
+	inputStlPath: "./tmp/araymond.stl",
 	reducedStlPath: "./tmp/test_output.stl",
 }, function(err, resp) {
 	console.log("err", err);
